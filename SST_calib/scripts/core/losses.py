@@ -13,6 +13,16 @@ import numpy as np
 from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
 
+# Geometric Filtering Constants (for segment_car_points_geometric)
+GEOMETRIC_MIN_FORWARD_DISTANCE = 2.0   # meters - minimum forward distance
+GEOMETRIC_MAX_DISTANCE = 50.0          # meters - maximum detection range
+GEOMETRIC_GROUND_HEIGHT = -1.7         # meters - approximate ground level
+GEOMETRIC_MIN_HEIGHT_ABOVE_GROUND = 0.2  # meters - clearance above ground
+GEOMETRIC_MAX_VEHICLE_HEIGHT = 2.5     # meters - maximum vehicle height
+
+# Projection Constants
+MIN_DEPTH_THRESHOLD = 0.1  # meters - minimum depth for valid projection
+
 
 class SemanticAlignmentLoss:
     """
@@ -121,7 +131,7 @@ class CalibrationLoss:
         points_cam = (R @ self.car_points_3d.T + t).T
         
         # Filter points behind camera
-        valid_depth = points_cam[:, 2] > 0.1
+        valid_depth = points_cam[:, 2] > MIN_DEPTH_THRESHOLD
         points_cam_valid = points_cam[valid_depth]
         
         if len(points_cam_valid) == 0:
@@ -195,14 +205,13 @@ def segment_car_points_geometric(point_cloud, R_approx, t_approx, K, img_size, b
     # - Forward facing (in front of vehicle)
     # - Reasonable distance
     # - Height consistent with vehicles (not ground, not sky)
-    ground_height = -1.7  # Approximate ground level
     
     geometric_mask = (
-        (x > 2.0) &  # At least 2m in front
-        (x < 50.0) &  # Within 50m
-        (np.sqrt(x**2 + y**2) < 50.0) &  # Distance limit
-        (z > ground_height + 0.2) &  # Above ground
-        (z < ground_height + 2.5)  # Below 2.5m height
+        (x > GEOMETRIC_MIN_FORWARD_DISTANCE) &  # At least 2m in front
+        (x < GEOMETRIC_MAX_DISTANCE) &  # Within 50m
+        (np.sqrt(x**2 + y**2) < GEOMETRIC_MAX_DISTANCE) &  # Distance limit
+        (z > GEOMETRIC_GROUND_HEIGHT + GEOMETRIC_MIN_HEIGHT_ABOVE_GROUND) &  # Above ground
+        (z < GEOMETRIC_GROUND_HEIGHT + GEOMETRIC_MAX_VEHICLE_HEIGHT)  # Below max vehicle height
     )
     
     candidate_points = point_cloud[geometric_mask, :3]
@@ -243,6 +252,39 @@ def segment_car_points_geometric(point_cloud, R_approx, t_approx, K, img_size, b
     car_points = candidate_in_bounds[on_mask]
     
     return car_points
+
+
+def segment_car_points_salsanext(point_cloud, binary_mask=None):
+    """
+    Segment car points using SalsaNext (no calibration needed).
+    
+    This is the NEW approach that removes ground truth dependency.
+    Unlike segment_car_points_geometric, this does NOT require:
+    - Approximate calibration (R, t)
+    - Camera intrinsics (K)
+    - Image size
+    
+    It uses the pretrained SalsaNext model to directly classify
+    points as cars in 3D space.
+    
+    Args:
+        point_cloud: (N, 4) full point cloud [x, y, z, intensity]
+        binary_mask: (optional) for compatibility with old signature, not used
+        
+    Returns:
+        car_points: (M, 3) XYZ of points classified as cars
+    """
+    # Cache the segmenter to avoid reloading model for every frame
+    if not hasattr(segment_car_points_salsanext, '_segmenter'):
+        from segmentation.lidar_segmentation import LidarSegmenter
+        
+        # Create and cache the segmenter
+        segment_car_points_salsanext._segmenter = LidarSegmenter()
+    
+    # Use cached SalsaNext to get car points
+    _, car_points = segment_car_points_salsanext._segmenter.get_car_points(point_cloud)
+    
+    return car_points[:, :3]  # Return only XYZ
 
 
 def test_corrected_loss():

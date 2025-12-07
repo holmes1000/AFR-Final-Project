@@ -63,8 +63,8 @@ class OnlineCalibrationDemo:
     
     def _preload_frames(self):
         """Pre-load frames with car segmentation."""
-        from losses import segment_car_points_geometric
-        from temporal_calibration import VisualOdometry
+        from core.losses import segment_car_points_salsanext
+        from temporal.temporal_calibration import VisualOdometry
         
         self.frames = []
         self.velocities = []
@@ -78,11 +78,8 @@ class OnlineCalibrationDemo:
             image, point_cloud = self.loader.load_frame_pair(i)
             _, binary_mask = self.img_segmentor.segment(image)
             
-            # Segment car points using GROUND TRUTH (this is fixed)
-            car_points_3d = segment_car_points_geometric(
-                point_cloud, self.R_gt, self.t_gt,
-                self.K, self.img_size, binary_mask
-            )
+            # Segment car points using SalsaNext (NO GROUND TRUTH NEEDED)
+            car_points_3d = segment_car_points_salsanext(point_cloud)
             
             self.frames.append({
                 'image': image,
@@ -115,12 +112,19 @@ class OnlineCalibrationDemo:
     
     def compute_error(self):
         """Compute error between our estimate and ground truth."""
-        from optimizer import compute_calibration_error
+        import sys
+        import os
+        # Ensure we import from current directory, not parent
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+        
+        from core.optimizer import compute_calibration_error
         
         err = compute_calibration_error(self.R_est, self.t_est, self.R_gt, self.t_gt)
         
         # Temporal error: difference between our estimate and simulated delay
-        delta_err_ms = abs(self.delta_est - self.simulated_delay) * 1000
+        delta_err_ms = abs(self.delta_est + self.simulated_delay) * 1000
         
         return err['atd_cm'], err['qad_deg'], delta_err_ms
     
@@ -194,8 +198,8 @@ class OnlineCalibrationDemo:
             print("  Already well calibrated, skipping.")
             return
         
-        from losses import SemanticAlignmentLoss, CalibrationLoss
-        from optimizer import rotation_matrix_to_axis_angle, axis_angle_to_rotation_matrix
+        from core.losses import SemanticAlignmentLoss, CalibrationLoss
+        from core.optimizer import rotation_matrix_to_axis_angle, axis_angle_to_rotation_matrix
         
         loss_calc = SemanticAlignmentLoss(pixel_downsample_rate=0.1, seed=42)
         
@@ -248,7 +252,7 @@ class OnlineCalibrationDemo:
         
         # self.R_est = axis_angle_to_rotation_matrix(result.x[:3])
         # self.t_est = result.x[3:6].reshape(3, 1)
-        from optimizer import MultiFrameOptimizer
+        from core.optimizer import MultiFrameOptimizer
         
         # Initialize Optimizer with CURRENT estimate
         # This uses the Weight Schedule defined in optimizer.py
@@ -275,8 +279,8 @@ class OnlineCalibrationDemo:
             print("  Already well calibrated, skipping.")
             return
         
-        from losses import SemanticAlignmentLoss, CalibrationLoss
-        from optimizer import rotation_matrix_to_axis_angle, axis_angle_to_rotation_matrix
+        from core.losses import SemanticAlignmentLoss, CalibrationLoss
+        from core.optimizer import rotation_matrix_to_axis_angle, axis_angle_to_rotation_matrix
         
         loss_calc = SemanticAlignmentLoss(pixel_downsample_rate=0.1, seed=42)
         
@@ -336,6 +340,9 @@ class OnlineCalibrationDemo:
         for stage, (w_i2p, max_iter) in enumerate(schedule):
             print(f"  Stage {stage+1}/3: weight={w_i2p}, iter={max_iter}")
             
+            # Regularization strength (decreases across stages)
+            lambda_reg = [0.1, 100.0, 10000.0][stage]
+            
             def joint_objective(p):
                 R = axis_angle_to_rotation_matrix(p[:3])
                 t = p[3:6].reshape(3, 1)
@@ -353,8 +360,15 @@ class OnlineCalibrationDemo:
                         total += loss
                         count += 1
                 
-                if count == 0: return 1e9 # Penalty for invalid state
-                return total / count
+                if count == 0: return 1e9
+                
+                # Regularization: penalize deviation from initial
+                rot_dev = np.sum((p[:3] - rotvec_est)**2)
+                trans_dev = np.sum((p[3:6] - t_est)**2)
+                delta_dev = (p[6] - delta_est)**2
+                reg_term = lambda_reg * (rot_dev + trans_dev + delta_dev)
+                
+                return total / count + reg_term
 
             # Run optimizer for this stage
             res = minimize(joint_objective, params, method='L-BFGS-B', 
@@ -466,7 +480,7 @@ class OnlineCalibrationDemo:
             if len(pts) > 0:
                 ax_no_delta.scatter(pts[:, 0], pts[:, 1], c='red', s=8, alpha=0.9)
             color = 'green' if atd < 3 else ('orange' if atd < 8 else 'red')
-            ax_no_delta.set_title(f"ESTIMATE (δ=0)\nATD={atd:.1f}cm, QAD={qad:.2f}°", 
+            ax_no_delta.set_title(f"ESTIMATE\nATD={atd:.1f}cm, QAD={qad:.2f}°", 
                                  color=color, fontsize=11)
             ax_no_delta.axis('off')
             
@@ -583,7 +597,7 @@ class OnlineCalibrationDemo:
         
         # 2. After perturbation
         np.random.seed(42)
-        self.perturb_estimate(t_noise_cm=5, r_noise_deg=3, delta_noise_ms=30)
+        self.perturb_estimate(t_noise_cm=5, r_noise_deg=3, delta_noise_ms=100)
         atd, qad, delta_err = self.compute_error()
         results.append((f'2. Error added (δ_sim={self.simulated_delay*1000:.0f}ms)', 
                        atd, qad, delta_err,
@@ -661,11 +675,20 @@ class OnlineCalibrationDemo:
 
 
 def main():
-    from data_loader import KITTIDataLoader
-    from image_segmentation import ImageSegmentor
+    import sys
+    import os
+    
+    # Add parent directory (scripts/) to path for imports
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.join(script_dir, '..')
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    
+    from utils.data_loader import KITTIDataLoader
+    from segmentation.image_segmentation import ImageSegmentor
     
     # =====================================================
-    BASE_PATH = r"D:\Coding\SST_calib SpatioTemporal Calibration\dataset" # <-- CHANGE THIS
+    BASE_PATH = os.path.join(script_dir, "../../dataset")  # Points to SST_calib/dataset
     DATE = "2011_09_26"
     DRIVE = "0005"
     # =====================================================

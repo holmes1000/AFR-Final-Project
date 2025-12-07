@@ -19,11 +19,11 @@ sys.path.append('src')
 
 def run_full_pipeline():
     """Run the complete SST-Calib pipeline."""
-    from data_loader import KITTIDataLoader
-    from image_segmentation import ImageSegmentor
-    from losses import (SemanticAlignmentLoss, CalibrationLoss,
+    from utils.data_loader import KITTIDataLoader
+    from segmentation.image_segmentation import ImageSegmentor
+    from core.losses import (SemanticAlignmentLoss, CalibrationLoss,
                        segment_car_points_geometric)
-    from optimizer import (MultiFrameOptimizer, compute_calibration_error,
+    from core.optimizer import (MultiFrameOptimizer, compute_calibration_error,
                           rotation_matrix_to_axis_angle, axis_angle_to_rotation_matrix)
     from temporal_calibration import VisualOdometry
     

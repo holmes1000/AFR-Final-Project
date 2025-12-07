@@ -13,6 +13,17 @@ from scipy.spatial.transform import Rotation
 import time
 import matplotlib.pyplot as plt
 
+# Optimization Bounds
+DEFAULT_ROTATION_BOUND_DEG = 15  # degrees - max rotation deviation from initial
+DEFAULT_TRANSLATION_BOUND_M = 0.20  # meters - max translation deviation from initial
+
+# Regularization Parameters (Equation 9 in paper)
+REGULARIZATION_LAMBDA_T = 1e4  # translation regularization weight
+REGULARIZATION_LAMBDA_R = 1e7  # rotation regularization weight
+
+# Optimization Tolerance
+OPTIMIZATION_FTOL = 1e-6  # function tolerance for convergence
+
 
 def rotation_matrix_to_axis_angle(R):
     """Convert rotation matrix to axis-angle representation."""
@@ -127,9 +138,9 @@ class MultiFrameOptimizer:
         
         params = params_init.copy()
         
-        # Bounds: ±15 degrees rotation, ±20cm translation from initial
-        rot_bound = 15 * np.pi / 180  # 15 degrees in radians
-        trans_bound = 0.20  # 20 cm
+        # Bounds from constants
+        rot_bound = DEFAULT_ROTATION_BOUND_DEG * np.pi / 180  # Convert to radians
+        trans_bound = DEFAULT_TRANSLATION_BOUND_M
         
         bounds = [
             (params_init[0] - rot_bound, params_init[0] + rot_bound),
@@ -141,8 +152,8 @@ class MultiFrameOptimizer:
         ]
         
         start_time = time.time()
-        reg_t = 1e4 if regularize else 0.0
-        reg_r = 1e7 if regularize else 0.0
+        reg_t = REGULARIZATION_LAMBDA_T if regularize else 0.0
+        reg_r = REGULARIZATION_LAMBDA_R if regularize else 0.0
         for stage, (weight_i2p, n_iter) in enumerate(weight_schedule):
             if verbose:
                 print(f"\nStage {stage+1}: weight_i2p={weight_i2p}, max_iter={n_iter}")
@@ -155,7 +166,7 @@ class MultiFrameOptimizer:
                 params,
                 method='L-BFGS-B',
                 bounds=bounds,
-                options={'maxiter': n_iter, 'disp': False, 'ftol': 1e-6}
+                options={'maxiter': n_iter, 'disp': False, 'ftol': OPTIMIZATION_FTOL}
             )
             
             params = result.x
@@ -224,8 +235,8 @@ def test_optimizer():
     """Test the calibration optimizer."""
     import sys
     sys.path.append('src')
-    from data_loader import KITTIDataLoader
-    from image_segmentation import ImageSegmentor
+    from utils.data_loader import KITTIDataLoader
+    from segmentation.image_segmentation import ImageSegmentor
     from losses import (SemanticAlignmentLoss, CalibrationLoss, 
                         segment_car_points_geometric)
     

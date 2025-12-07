@@ -1,7 +1,15 @@
 import numpy as np
 
 def load_calib_cam_to_cam(filepath):
-    """Load camera-to-camera calibration (includes intrinsics)"""
+    """Load camera-to-camera calibration from KITTI format file.
+    
+    Args:
+        filepath: Path to calib_cam_to_cam.txt file
+        
+    Returns:
+        P2: (3,4) projection matrix for camera 2
+        R0_rect: (3,3) rectification rotation matrix
+    """
     data = {}
     with open(filepath, 'r') as f:
         for line in f:
@@ -19,7 +27,16 @@ def load_calib_cam_to_cam(filepath):
     return P2, R0_rect
 
 def load_calib_velo_to_cam(filepath):
-    """Load velodyne-to-camera calibration (extrinsics)"""
+    """Load velodyne-to-camera calibration from KITTI format file.
+    
+    Args:
+        filepath: Path to calib_velo_to_cam.txt file
+        
+    Returns:
+        Tr_velo_to_cam: (4,4) transformation matrix from velodyne to camera
+        R: (3,3) rotation matrix
+        T: (3,1) translation vector
+    """
     data = {}
     with open(filepath, 'r') as f:
         for line in f:
@@ -43,7 +60,11 @@ def load_calib_velo_to_cam(filepath):
 
 class Calibration:
     def __init__(self, calib_dir):
-        """Load all calibration data"""
+        """Initialize calibration by loading KITTI calibration files.
+        
+        Args:
+            calib_dir: Directory containing calibration files
+        """
         # Camera intrinsics and rectification
         self.P2, self.R0_rect = load_calib_cam_to_cam(
             f"{calib_dir}/calib_cam_to_cam.txt"

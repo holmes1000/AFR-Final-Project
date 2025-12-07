@@ -243,7 +243,7 @@ class TemporalCalibrator:
         # Now optimize time delay
         # For each frame, compute loss with time-compensated translation
         
-        from losses import SemanticAlignmentLoss, CalibrationLoss
+        from core.losses import SemanticAlignmentLoss, CalibrationLoss
         
         loss_calc = SemanticAlignmentLoss(pixel_downsample_rate=0.05, seed=42)
         
@@ -333,10 +333,10 @@ def test_temporal_calibration():
     """Test temporal calibration."""
     import sys
     sys.path.append('src')
-    from data_loader import KITTIDataLoader
-    from image_segmentation import ImageSegmentor
-    from losses import segment_car_points_geometric
-    from optimizer import compute_calibration_error
+    from utils.data_loader import KITTIDataLoader
+    from segmentation.image_segmentation import ImageSegmentor
+    from core.losses import segment_car_points_geometric
+    from core.optimizer import compute_calibration_error
     
     # =====================================================
     # CONFIGURE THESE PATHS

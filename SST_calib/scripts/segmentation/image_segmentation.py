@@ -15,6 +15,9 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 
+# Import base class
+from .base import ImageSegmentorBase
+
 
 # Cityscapes class names (21 classes in PASCAL VOC pretrained model)
 # For driving scenes, we'll use the COCO pretrained model which has 'car' class
@@ -34,7 +37,7 @@ TARGET_CLASSES = {
 }
 
 
-class ImageSegmentor:
+class ImageSegmentor(ImageSegmentorBase):
     """
     Semantic segmentation for RGB images using DeepLabV3.
     
