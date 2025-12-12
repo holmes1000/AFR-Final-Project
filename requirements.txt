@@ -5,3 +5,10 @@ scipy
 torch
 torchvision
 pyyaml
+open3d
+scikit-image
+tqdm
+jupyter
+pandas
+plotly
+seaborn

@@ -1,4 +1,104 @@
-# SST-Calib: Spatial-Temporal LiDAR-Camera Calibration
+# AFR Final Projects
+
+# 1. Glass Walls Detection
+
+## 1.1. Camera-based Glass Walls Detection
+
+Vision-based glass detection using RGB images and deep learning techniques.
+
+### Overview
+
+Detects transparent glass surfaces in RGB images using computer vision and machine learning approaches. The method analyzes visual cues such as reflections, edge patterns, and context to identify glass walls and surfaces.
+
+### Method
+
+The camera-based approach uses:
+- Image preprocessing and enhancement
+- Edge detection and feature extraction
+- Deep learning models for glass segmentation
+- Post-processing for refined detection
+
+### Requirements
+
+```bash
+conda create -n camera-glass python=3.8
+conda activate camera-glass
+pip install numpy matplotlib opencv-python torch torchvision pillow jupyter
+```
+
+### Data Structure
+
+```
+detecting_glass_walls/Camera/
+├── camera_glass_detection.ipynb  # Main detection notebook
+├── test.ipynb                     # Testing and validation
+└── test_images/                   # Sample test images
+    ├── *.png
+    ├── *.jpg
+    └── *.jpeg
+```
+
+### Usage
+
+1. Navigate to Camera directory:
+   ```bash
+   cd detecting_glass_walls/Camera
+   ```
+
+2. Launch Jupyter notebook:
+   ```bash
+   jupyter notebook camera_glass_detection.ipynb
+   ```
+
+3. Run all cells to process test images
+4. View detection results and visualizations
+
+
+## 1.2. LiDAR-based Glass Walls Detection
+
+A computationally efficient glass detection method using multi-LiDAR intensity patterns.
+
+## Overview
+
+Detects glass surfaces by exploiting their unique LiDAR signature: **isolated bright spots** (high intensity reflection) surrounded by darkness (no returns through glass).
+
+## Method
+
+6-step pipeline:
+1. 2D intensity image projection
+2. Gaussian smoothing
+3. Peak detection (40-95 percentile)
+4. Radial isolation verification (16 directions)
+5. Watershed segmentation
+6. Spatial/size filtering
+
+## Requirements
+
+```bash
+conda create -n glass-detection python=3.8
+conda activate glass-detection
+pip install numpy matplotlib scipy scikit-image opencv-python open3d
+```
+
+## Data Structure
+
+```
+sample_data/
+├── hesai/*.ply
+├── ouster/*.ply
+├── rgb/*.png
+├── hesai_pose.txt
+└── ouster_pose.txt
+```
+
+## Usage
+
+1. Set `DATA_FOLDER` path in notebook
+2. Run all cells in `detecting_glass_walls/Lidar/lidar_glass_detection.ipynb`
+3. View detection results
+
+
+# 2. Spatial-Temporal LiDAR-Camera Calibration
 
 > **Note:** This is a course project implementation based on the SST-Calib paper. The implementation may not achieve the same accuracy as reported in the original paper and is intended for educational purposes.
 

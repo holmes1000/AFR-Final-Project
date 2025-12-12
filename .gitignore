@@ -39,6 +39,6 @@ Thumbs.db
 ._*
 
 # Dataset
-SST_calib SpatioTemporal Calibration/dataset/
-SST_calib/dataset/
+spatial_temporal_calib-Cam&Lidar/dataset/
+detecting_glass_walls/Camera/test_images/
 
